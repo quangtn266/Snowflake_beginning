@@ -1,0 +1,82 @@
+// Database to manage stage objects, fileformat etc.
+CREATE OR REPLACE DATABASE MANAGE_DB;
+
+CREATE OR REPLACE SCHEMA external_stages;
+
+// Creating external stage
+CREATE OR REPLACE STAGE aws_stage
+    url='s3://bucketsnowflake3'
+    credentials=(aws_key_id='ABCD_DUMMY_ID' aws_secret_key='1234abcd_key');
+
+// Description of external stage
+DESC STAGE aws_stage
+
+// Alter external stage
+ALTER STAGE aws_stage
+    SET credentials=(aws_key_id='XYZ_DUMMY_ID' aws_secret_key='987xyz')
+
+// publicly accessible staging area
+CREATE OR REPLACE STAGE MANAGE_DB.external_stages.aws_stage
+    url='s3://bucketsnowflakes3';
+
+// list files in stage
+LIST @aws_stage;
+
+
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT,
+    PROFIT INT,
+    QUANITY INT,
+    CATEGORY VARCHAR(30),
+    SUBCATEGORY VARCHAR(30)
+);
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS;
+
+// Load data using copy command
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS
+    FROM @aws_stage
+    file_format = (type = csv field_delimiter=',' skip_header=1);
+
+// Copy command with fully qualified stage object
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS
+    FROM @MANAGE_DB.external_stages.aws_stage
+    file_format = (type = csv field_delimiter=',' skip_header=1);
+
+// List files contained in stage
+LIST @MANAGE_DB.EXTERNAL_STAGES.AWS_STAGE;
+
+// COPY command with specified with(s)
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS
+    FROM @MANAGE_DB.external_stages.aws_stage
+    file_format = (type = csv field_delimiter=',', skip_header=1)
+    files = ('OrderDetails.csv');
+
+// COPY command with pattern for file names
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS
+    FROM @MANAGE_DB.external_stages.aws_stage
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    pattern='.*Order.*csv';
+
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.EXERCISE_DB (
+    ID INT,
+    FIRST_NAME VARCHAR(30),
+    LAST_NAME VARCHAR(30),
+    EMAIL VARCHAR(100),
+    AGE INT,
+    CITY VARCHAR(30)
+)
+
+////// Excercise
+
+CREATE OR REPLACE STAGE aws_snowflake_ass_stage
+    url='s3://snowflake-assignments-mc/loadingdata/'
+
+LIST @MANAGE_DB.external_stages.aws_snowflake_ass_stage;
+
+COPY INTO OUR_FIRST_DB.PUBLIC.EXERCISE_DB
+    FROM @MANAGE_DB.external_stages.aws_snowflake_ass_stage
+    file_format = (type = csv field_delimiter=';' skip_header=1)
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.EXERCISE_DB;
