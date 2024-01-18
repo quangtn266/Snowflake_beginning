@@ -1,0 +1,24 @@
+ ---- Assignment - Create file format & load data ----
+ 
+-- create stage object
+CREATE OR REPLACE STAGE EXERCISE_DB.public.aws_stage
+    url='s3://snowflake-assignments-mc/fileformat';
+
+-- List files in stage
+LIST @EXERCISE_DB.public.aws_stage;
+
+-- create file format object
+CREATE OR REPLACE FILE FORMAT EXERCISE_DB.public.aws_fileformat
+TYPE = CSV
+FIELD_DELIMITER='|'
+SKIP_HEADER=1;
+
+-- Load the data 
+COPY INTO EXERCISE_DB.PUBLIC.CUSTOMERS
+    FROM @aws_stage
+      file_format= (FORMAT_NAME=EXERCISE_DB.public.aws_fileformat)
+      
+-- Alternative
+COPY INTO EXERCISE_DB.PUBLIC.CUSTOMERS
+    FROM @aws_stage
+      file_format= EXERCISE_DB.public.aws_fileformat
