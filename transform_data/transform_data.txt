@@ -1,0 +1,89 @@
+
+
+// Transforming using Select statement
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM (select s.$1, s.$2 from @MANAGE_DB.external_stages.aws_stage s)
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    files=('OrderDetails.csv');
+
+// Create a ORDER_EX table
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT
+)
+
+// show all information of ORDERS_EX table
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX
+
+// example 2 table
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT,
+    PROFIT INT,
+    PROFITABLE_FLAG VARCHAR(30)
+)
+
+// copy command using a sql function (subset of functions avaiable)
+
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM (select
+            s.$1,
+            s.$2,
+            s.$3,
+            CASE WHEN CAST (s.$3 as int) < 0 THEN 'not profitable' ELSE 'profitable' END
+        from @MANAGE_DB.external_stages.aws_stage s)
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    files=('OrderDetails.csv');
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+// CREATE NEW ORDER_EX TABLE
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT,
+    PROFIT INT,
+    CATEGEORY_SUBSTRING VARCHAR(5)
+)
+
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM (select
+        s.$1,
+        s.$2,
+        s.$3,
+        substring(s.$5,1,5)
+        from @MANAGE_DB.external_stages.aws_stage s)
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    files=('OrderDetails.csv');
+
+
+// Using subset of columns
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX (ORDER_ID, PROFIT)
+    FROM (select
+        s.$1,
+        s.$3
+        from @MANAGE_DB.external_stages.aws_stage s
+    )
+    file_format= (type = csv field_delimiter=',' skip_header=1)
+    files=('OrderDetails.csv');
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX
+
+// Table auto increment
+
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID number autoincrement start 1 increment 1,
+    AMOUNT INT,
+    PROFIT INT,
+    PROFITABLE_FLAG VARCHAR(30)
+)
+
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX (PROFIT, AMOUNT)
+    FROM (select 
+            s.$2,
+            s.$3
+            from @MANAGE_DB.external_stages.aws_stage s
+            )
+        file_format= (type = csv field_delimiter=',' skip_header=1)
+        files=('OrderDetails.csv');
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX WHERE ORDER_ID > 15;
