@@ -1,0 +1,35 @@
+CREATE OR REPLACE stage MANAGE_DB.EXTERNAL_STAGES.JSONSTAGE
+    url='s3://snowflake-assignments-mc/unstructureddata/';
+
+CREATE OR REPLACE file format MANAGE_DB.PUBLIC.JSONFORMAT
+    TYPE=JSON;
+
+CREATE OR REPLACE table OUR_FIRST_DB.PUBLIC.JSON_RAW(
+    raw_file variant
+);
+
+COPY INTO OUR_FIRST_DB.PUBLIC.JSON_RAW
+    FROM @MANAGE_DB.EXTERNAL_STAGES.JSONSTAGE
+    file_format = MANAGE_DB.PUBLIC.JSONFORMAT;
+    //files= ('HR_data.json');
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.JSON_RAW;
+
+SELECT
+ RAW_FILE:first_name::STRING as first_name,
+ RAW_FILE:last_name::STRING as last_name,
+ RAW_FILE:Skills[0]::STRING as skills1,
+ RAW_FILE:Skills[1]::STRING as skills2
+FROM OUR_FIRST_DB.PUBLIC.JSON_RAW;
+
+
+CREATE TABLE OUR_FIRST_DB.PUBLIC.SKILLS AS
+SELECT 
+$1:first_name::STRING as first_name,
+$1:last_name::STRING as last_name,
+$1:Skills[0]::STRING as Skill_1,
+$1:Skills[1]::STRING as Skill_2
+FROM OUR_FIRST_DB.PUBLIC.JSON_RAW;
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.SKILLS
+WHERE FIRST_NAME='Florina';

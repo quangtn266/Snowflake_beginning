@@ -1,0 +1,38 @@
+SELECT
+    array_size(RAW_FILE:spoken_languages) as spoken_languages
+FROM OUR_FIRST_DB.PUBLIC.JSON_RAW
+
+SELECT
+    RAW_FILE:first_name::STRING as first_name,
+    array_size(RAW_FILE:spoken_languages) as spoken_languages
+FROM OUR_FIRST_DB.PUBLIC.JSON_RAW
+
+select
+      RAW_FILE:first_name::STRING as First_name,
+    f.value:language::STRING as First_language,
+   f.value:level::STRING as Level_spoken
+from OUR_FIRST_DB.PUBLIC.JSON_RAW, table(flatten(RAW_FILE:spoken_languages)) f;
+
+// Optional1 : Create table as 
+
+CREATE OR REPLACE TABLE Languages AS
+select
+      RAW_FILE:first_name::STRING as First_name,
+    f.value:language::String as First_language,
+   f.value:level::STRING as Level_spoken
+from OUR_FIRST_DB.PUBLIC.JSON_RAW, table(flatten(RAW_FILE:spoken_languages)) f;
+
+SELECT * FROM Languages;
+
+truncate table languages;
+
+// Option2 insert
+
+INSERT INTO Languages
+select
+      RAW_FILE:first_name::STRING as First_name,
+    f.value:language::String as First_language,
+   f.value:level::STRING as Level_spoken
+from OUR_FIRST_DB.PUBLIC.JSON_RAW, table(flatten(RAW_FILE:spoken_languages)) f;
+
+SELECT * FROM Languages;

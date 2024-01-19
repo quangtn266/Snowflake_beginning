@@ -1,0 +1,37 @@
+CREATE OR REPLACE TABLE COPY_DB.PUBLIC.ORDERS (
+    CUSTOMER_ID INT,
+    FIRT_NAME VARCHAR(50),
+    LAST_NAME VARCHAR(50),
+    EMAIL VARCHAR(50),
+    AGE INT,
+    DEPARTMENT VARCHAR(50)
+);
+
+CREATE OR REPLACE STAGE COPY_DB.PUBLIC.AWS_STAGE_COPY
+    url="s3://snowflake-assignments-mc/copyoptions/example2"
+
+LIST @COPY_DB.PUBLIC.AWS_STAGE_COPY
+
+    
+CREATE OR REPLACE FILE FORMAT COPY_DB.PUBLIC.aws_fileformat
+    TYPE=CSV
+    FIELD_DELIMITER=','
+    SKIP_HEADER=1;
+
+
+
+-- Use validation mode
+COPY INTO COPY_DB.PUBLIC.ORDERS
+    FROM @COPY_DB.PUBLIC.aws_stage_copy
+      file_format= COPY_DB.public.aws_fileformat
+      VALIDATION_MODE = RETURN_ERRORS;
+    
+
+-- Use TRUNCATECOLUMNS
+
+COPY INTO COPY_DB.PUBLIC.ORDERS
+    FROM @COPY_DB.PUBLIC.aws_stage_copy
+      file_format= COPY_DB.public.aws_fileformat
+      TRUNCATECOLUMNS = TRUE; 
+
+SELECT * from COPY_DB.PUBLIC.ORDERS
