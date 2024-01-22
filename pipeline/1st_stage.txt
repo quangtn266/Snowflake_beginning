@@ -1,0 +1,353 @@
+// Database to manage stage objects, fileformat etc.
+CREATE OR REPLACE DATABASE MANAGE_DB;
+
+CREATE OR REPLACE SCHEMA external_stages;
+
+// Creating external stage
+CREATE OR REPLACE STAGE aws_stage
+    url='s3://bucketsnowflake3'
+    credentials=(aws_key_id='ABCD_DUMMY_ID' aws_secret_key='1234abcd_key');
+
+// Description of external stage
+DESC STAGE aws_stage
+
+// Alter external stage
+ALTER STAGE aws_stage
+    SET credentials=(aws_key_id='XYZ_DUMMY_ID' aws_secret_key='987xyz')
+
+// publicly accessible staging area
+CREATE OR REPLACE STAGE MANAGE_DB.external_stages.aws_stage
+    url='s3://bucketsnowflakes3';
+
+// list files in stage
+LIST @aws_stage;
+
+
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT,
+    PROFIT INT,
+    QUANITY INT,
+    CATEGORY VARCHAR(30),
+    SUBCATEGORY VARCHAR(30)
+);
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS;
+
+// Load data using copy command
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS
+    FROM @aws_stage
+    file_format = (type = csv field_delimiter=',' skip_header=1);
+
+// Copy command with fully qualified stage object
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS
+    FROM @MANAGE_DB.external_stages.aws_stage
+    file_format = (type = csv field_delimiter=',' skip_header=1);
+
+// List files contained in stage
+LIST @MANAGE_DB.EXTERNAL_STAGES.AWS_STAGE;
+
+// COPY command with specified with(s)
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS
+    FROM @MANAGE_DB.external_stages.aws_stage
+    file_format = (type = csv field_delimiter=',', skip_header=1)
+    files = ('OrderDetails.csv');
+
+// COPY command with pattern for file names
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS
+    FROM @MANAGE_DB.external_stages.aws_stage
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    pattern='.*Order.*csv';
+
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.EXERCISE_DB (
+    ID INT,
+    FIRST_NAME VARCHAR(30),
+    LAST_NAME VARCHAR(30),
+    EMAIL VARCHAR(100),
+    AGE INT,
+    CITY VARCHAR(30)
+)
+
+////// Excercise
+
+CREATE OR REPLACE STAGE aws_snowflake_ass_stage
+    url='s3://snowflake-assignments-mc/loadingdata/'
+
+LIST @MANAGE_DB.external_stages.aws_snowflake_ass_stage;
+
+COPY INTO OUR_FIRST_DB.PUBLIC.EXERCISE_DB
+    FROM @MANAGE_DB.external_stages.aws_snowflake_ass_stage
+    file_format = (type = csv field_delimiter=';' skip_header=1)
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.EXERCISE_DB;
+
+
+
+// Transforming using Select statement
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM (select s.$1, s.$2 from @MANAGE_DB.external_stages.aws_stage s)
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    files=('OrderDetails.csv');
+
+// Create a ORDER_EX table
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT
+)
+
+// show all information of ORDERS_EX table
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX
+
+// example 2 table
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT,
+    PROFIT INT,
+    PROFITABLE_FLAG VARCHAR(30)
+)
+
+// copy command using a sql function (subset of functions avaiable)
+
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM (select
+            s.$1,
+            s.$2,
+            s.$3,
+            CASE WHEN CAST (s.$3 as int) < 0 THEN 'not profitable' ELSE 'profitable' END
+        from @MANAGE_DB.external_stages.aws_stage s)
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    files=('OrderDetails.csv');
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+// CREATE NEW ORDER_EX TABLE
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT,
+    PROFIT INT,
+    CATEGEORY_SUBSTRING VARCHAR(5)
+)
+
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM (select
+        s.$1,
+        s.$2,
+        s.$3,
+        substring(s.$5,1,5)
+        from @MANAGE_DB.external_stages.aws_stage s)
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    files=('OrderDetails.csv');
+
+
+// Using subset of columns
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX (ORDER_ID, PROFIT)
+    FROM (select
+        s.$1,
+        s.$3
+        from @MANAGE_DB.external_stages.aws_stage s
+    )
+    file_format= (type = csv field_delimiter=',' skip_header=1)
+    files=('OrderDetails.csv');
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX
+
+// Table auto increment
+
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID number autoincrement start 1 increment 1,
+    AMOUNT INT,
+    PROFIT INT,
+    PROFITABLE_FLAG VARCHAR(30)
+)
+
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX (PROFIT, AMOUNT)
+    FROM (select 
+            s.$2,
+            s.$3
+            from @MANAGE_DB.external_stages.aws_stage s
+            )
+        file_format= (type = csv field_delimiter=',' skip_header=1)
+        files=('OrderDetails.csv');
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX WHERE ORDER_ID > 15;
+
+//////////////// DEAL ERROR
+
+// CREATE a new stage
+CREATE OR REPLACE STAGE MANAGE_DB.external_stages.aws_stage_errorex
+    url="s3://bucketsnowflakes4";
+
+// List files in stage
+LIST @MANAGE_DB.external_stages.aws_stage_errorex;
+
+// Create example table
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT,
+    PROFIT INT,
+    QUANITY INT,
+    CATEGORY VARCHAR(30),
+    SUBCATEGORY VARCHAR(30));
+
+// Demonstrating error message
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM @MANAGE_DB.external_stages.aws_stage_errorex
+    file_format= (type = csv field_delimiter=',' skip_header=1)
+    files = ('OrderDetails_error.csv');
+
+// Validating table is empty
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+// Error handling using the ON_ERROR option
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM @MANAGE_DB.external_stages.aws_stage_errorex
+    file_format= (type = csv field_delimiter=',' skip_header=1)
+    files = ('OrderDetails_error.csv')
+    ON_ERROR = 'CONTINUE';
+
+// Validating results and truncating table
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+SELECT COUNT(*) FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+TRUNCATE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+// Error handling using the ON_ERROR option = ABORT_STATEMENT (default)
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM @MANAGE_DB.external_stages.aws_stage_errorex
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    files= ('OrderDetails_error.csv','OrderDetails_error2.csv')
+    ON_ERROR = 'ABORT_STATEMENT';
+
+// validating results and truncating table
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+SELECT COUNT(*) FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+TRUNCATE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX
+
+// Error handling using the ON_ERROR option = SKIP_FILE
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM @MANAGE_DB.external_stages.aws_stage_errorex
+    file_format= (type = csv field_delimiter=',' skip_header=1)
+    files = ('OrderDetails_error.csv', 'OrderDetails_error2.csv')
+    ON_ERROR = 'SKIP_FILE';
+
+// validating results and truncating table
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+SELECT COUNT(*) FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+TRUNCATE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+// Error handling using the ON_ERROR option = SKIP_FILE_<number>
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM @MANAGE_DB.external_stages.aws_stage_errorex
+    file_format = (type = csv field_delimiter=',' skip_header=1)
+    files = ('OrderDetails_error.csv', 'OrderDetails_error2.csv')
+    ON_ERROR = 'SKIP_FILE_3'
+
+// validating results and truncating table
+SELECT * FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+SELECT COUNT(*) FROM OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+TRUNCATE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+
+//// Specifying file_format In Copy command
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM @MANAGE_DB.external_stages.aws_stage_errorex
+    file_format = (type = csv field_delimiter='.' skip_header=1)
+    files = ('OrderDetails_error.csv')
+    ON_ERROR = 'SKIP_FILE_3';
+
+// Creating table
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.ORDERS_EX (
+    ORDER_ID VARCHAR(30),
+    AMOUNT INT,
+    PROFIT INT,
+    QUANTITY INT,
+    CATEGORY VARCHAR(30),
+    SUBCATEGORY VARCHAR(30)
+);
+
+// Creating shcema to keep things organized
+CREATE OR REPLACE SCHEMA MANAGE_DB.file_formats;
+
+// Creating file format object
+CREATE OR REPLACE file format MANAGE_DB.file_formats.my_file_format;
+
+// See properties of file format object
+DESC file format MANAGE_DB.file_formats.my_file_format;
+
+// Using file format object in Copy command
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM @MANAGE_DB.external_stages.aws_stage_errorex
+    file_format = (FORMAT_NAME=MANAGE_DB.file_formats.my_file_format)
+    files = ('OrderDetails_error.csv')
+    ON_ERROR = 'SKIP_FILE_3'
+
+// ALtering file format
+ALTER file format MANAGE_DB.file_formats.my_file_format
+    SET SKIP_HEADER=1;
+
+// DEFINING properties on creation of file format object
+CREATE OR REPLACE file format MANAGE_DB.file_formats.my_file_format
+    TYPE=JSON,
+    TIME_FORMAT=AUTO;
+
+// See properties of file format object
+DESC file format MANAGE_DB.file_formats.my_file_format;
+
+// Using file format object in copy command
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM @MANAGE_DB.external_stages.aws_stage_errorex
+    file_format = (FORMAT_NAME=MANAGE_DB.file_formats.my_file_format)
+    files= ('OrderDetails_error.csv')
+    ON_ERROR = 'SKIP_FILE_3';
+
+// Altering the type of a file format is not possible
+ALTER file format MANAGE_DB.file_formats.my_file_format
+SET TYPE = CSV
+
+// Recreate file format (default = CSV)
+CREATE OR REPLACE file format MANAGE_DB.file_formats.my_file_format
+
+// See properties of file format object
+DESC file format MANAGE_DB.file_formats.my_file_format
+
+// Truncate table 
+TRUNCATE table OUR_FIRST_DB.PUBLIC.ORDERS_EX;
+
+// Overwritting properties of file format object
+COPY INTO OUR_FIRST_DB.PUBLIC.ORDERS_EX
+    FROM @MANAGE_DB.external_stages.aws_stage_errorex
+    file_format = (FORMAT_NAME = MANAGE_DB.file_formats.my_file_format field_delimiter = ',' skip_header=1)
+    ON_ERROR= 'SKIP_FILE_3';
+
+DESC STAGE MANAGE_DB.external_stages.aws_stage_errorex;
+
+
+//////////////////// Exercise 4 
+
+ ---- Assignment - Create file format & load data ----
+ 
+-- create stage object
+CREATE OR REPLACE STAGE EXERCISE_DB.public.aws_stage
+    url='s3://snowflake-assignments-mc/fileformat';
+
+-- List files in stage
+LIST @EXERCISE_DB.public.aws_stage;
+
+-- create file format object
+CREATE OR REPLACE FILE FORMAT EXERCISE_DB.public.aws_fileformat
+TYPE = CSV
+FIELD_DELIMITER='|'
+SKIP_HEADER=1;
+
+-- Load the data 
+COPY INTO EXERCISE_DB.PUBLIC.CUSTOMERS
+    FROM @aws_stage
+      file_format= (FORMAT_NAME=EXERCISE_DB.public.aws_fileformat)
+      
+-- Alternative
+COPY INTO EXERCISE_DB.PUBLIC.CUSTOMERS
+    FROM @aws_stage
+      file_format= EXERCISE_DB.public.aws_fileformat

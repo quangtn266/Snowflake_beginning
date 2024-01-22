@@ -1,0 +1,138 @@
+// Create table first
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.EMPLOYEES (
+    id INT,
+    first_name STRING,
+    last_name STRING,
+    email STRING,
+    location STRING,
+    department STRING
+)
+
+CREATE OR REPLACE schema MANAGE_DB.file_formats 
+
+// Create file format object
+CREATE OR REPLACE file format MANAGE_DB.FILE_FORMATS.csv_fileformat
+    type = csv
+    field_delimiter = ","
+    skip_header = 1
+    null_if = ('NULL', 'null')
+    empty_field_as_null = TRUE;
+
+// create stage object with integration object & file format
+CREATE OR REPLACE stage MANAGE_DB.EXTERNAL_STAGES.csv_folder
+    URL = 's3://snowflakes3bucketquangtn260693/csv/snowpipe'
+    STORAGE_INTEGRATION = s3_int
+    FILE_FORMAT = MANAGE_DB.file_formats.csv_fileformat
+
+// Create stage object with integration object & file format object
+LIST @MANAGE_DB.external_stages.csv_folder
+
+// Create a schema to keep things organized
+CREATE OR REPLACE schema MANAGE_DB.pipes
+
+// Define pipe
+CREATE OR REPLACE pipe MANAGE_DB.pipes.employee_pipe
+auto_ingest = TRUE
+AS
+COPY INTO OUR_FIRST_DB.PUBLIC.employees
+FROM @MANAGE_DB.external_stages.csv_folder
+
+// Describe pipe
+DESC pipe MANAGE_DB.pipes.employee_pipe
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.EMPLOYEES
+
+// Error handling
+
+// Create file format object
+CREATE OR REPLACE file format MANAGE_DB.file_formats.csv_fileformat
+ type = csv
+ field_delimiter = '|'
+ skip_header = 1
+ null_if = ('NULL', 'null')
+ empty_field_as_null = TRUE;
+
+ SELECT * FROM OUR_FIRST_DB.PUBLIC.EMPLOYEES
+
+ ALTER PIPE MANAGE_DB.pipes.employee_pipe refresh
+
+// Validate pipe is actually working
+SELECT SYSTEM$PIPE_STATUS('employee_pipe')
+
+// Snowpipe error message
+SELECT * FROM TABLE(VALIDATE_PIPE_LOAD(
+    PIPE_NAME => 'MANAGE_DB.pipes.employee_pipe',
+    START_TIME => DATEADD(HOUR,-2,CURRENT_TIMESTAMP())))
+
+// COPY history from table to see error message
+SELECT * FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
+    table_name => 'OUR_FIRST_DB.PUBLIC.employees',
+    START_TIME => DATEADD(HOUR, -2, CURRENT_TIMESTAMP())
+))
+
+// 2nd trials with ','
+// Create file format object
+CREATE OR REPLACE file format MANAGE_DB.file_formats.csv_fileformat
+ type = csv
+ field_delimiter = ','
+ skip_header = 1
+ null_if = ('NULL', 'null')
+ empty_field_as_null = TRUE;
+
+
+ --- Manages pipes ----
+
+ DESC pipe MANAGE_DB.pipes.employee_pipe
+
+ SHOW PIPES;
+
+ SHOW PIPES like '%employee%'
+
+ SHOW PIPES in database MANAGE_DB
+
+ SHOW PIPES in schema MANAGE_DB.pipes
+
+ SHOW PIPES like '%employee%' in Database MANAGE_DB
+
+
+ -- Changing pipe (alter stage or file format)]
+
+ // preparation table first
+ CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.employee2 (
+    id INT,
+    first_name STRING,
+    last_name STRING,
+    email STRING,
+    location STRING,
+    department STRING
+ )
+
+ // Pause pipe
+ ALTER PIPE MANAGE_DB.pipes.employee_pipe SET PIPE_EXECUTION_PAUSED = true
+
+ // verify pipe is paused and has pending filecount0
+ SELECT SYSTEM$PIPE_STATUS('MANAGE_DB.pipes.employee_pipe')
+
+ // Recreate the pipe to change the COPY commands in the definition.
+ CREATE OR REPLACE pipe MANAGE_DB.pipes.employee_pipe
+ auto_ingest = TRUE
+ AS
+ COPY INTO OUR_FIRST_DB.PUBLIC.employee2
+ FROM @MANAGE_DB.external_stages.csv_folder
+
+ ALTER PIPE MANAGE_DB.pipes.employee_pipe refresh
+ 
+// LIst files in stage
+LIST @MANAGE_DB.external_stages.csv_folder 
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.employee2
+
+// Repload files manually that where already in the bucket
+COPY INTO OUR_FIRST_DB.PUBLIC.EMPLOYEE2
+FROM @MANAGE_DB.external_stages.csv_folder
+
+// Resume pipe
+ALTER PIPE MANAGE_DB.PIPES.EMPLOYEE_PIPE SET PIPE_EXECUTION_PAUSED = false
+
+// verify pipe is running again
+SELECT SYSTEM$PIPE_STATUS('MANAGE_DB.pipes.employee_pipe')
