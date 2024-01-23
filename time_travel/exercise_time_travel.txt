@@ -1,0 +1,28 @@
+CREATE OR REPLACE DATABASE DEMO_DB;
+
+CREATE OR REPLACE TABLE DEMO_DB.PUBLIC.PART
+AS
+SELECT * FROM "SNOWFLAKE_SAMPLE_DATA"."TPCH_SF1"."PART";
+
+SELECT * FROM PART
+ORDER BY P_MFGR DESC;
+
+UPDATE DEMO_DB.PUBLIC.PART
+SET P_MFGR='Manufacturer#CompanyX'
+WHERE P_MFGR='Manufacturer#5';
+
+SELECT * FROM PART
+ORDER BY P_MFGR DESC;
+
+SELECT * FROM DEMO_DB.PUBLIC.PART at (OFFSET => -60*0.5)
+SELECT * FROM DEMO_DB.PUBLIC.PART at (OFFSET => -60*1.5)
+SELECT * FROM DEMO_DB.PUBLIC.PART before (timestamp => '2021-04-15 17:47:50.581'::timestamp)
+
+-- Step 3.1: Travel back using the offset until you get the result of before the update
+
+SELECT * FROM PART at (OFFSET => -60*1.5) ORDER BY P_MFGR DESC;
+
+
+-- Step 3.2: Travel back using the query id to get the result before the update
+
+SELECT * FROM PART before (statement => '01b1da49-3200-fbef-0007-95ce0001114e');

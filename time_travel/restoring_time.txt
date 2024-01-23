@@ -1,0 +1,64 @@
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.TEST (
+    id int,
+    first_name string,
+    last_name string,
+    email string,
+    gender string,
+    Job string,
+    Phone string
+);
+
+COPY INTO OUR_FIRST_DB.public.test
+FROM @MANAGE_DB.external_stages.time_travel_stage
+files=('customers.csv');
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.TEST;
+
+UPDATE OUR_FIRST_DB.PUBLIC.TEST
+SET LAST_NAME = 'Tyson'
+
+UPDATE OUR_FIRST_DB.PUBLIC.TEST
+SET JOB = 'Data Analyst'
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.test before (statement => '01b1da4e-3200-fb9c-0000-000795cee241')
+
+/// Bad method
+
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.TEST as
+SELECT * FROM OUR_FIRST_DB.PUBLIC.test before (statement => '01b1da4e-3200-fb9c-0000-000795cee241')
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.TEST
+
+/// Good method
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.TEST (
+    id int,
+    first_name string,
+    last_name string,
+    email string,
+    gender string,
+    Job string,
+    Phone string
+);
+
+COPY INTO OUR_FIRST_DB.public.test
+FROM @MANAGE_DB.external_stages.time_travel_stage
+files=('customers.csv');
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.TEST;
+
+UPDATE OUR_FIRST_DB.PUBLIC.TEST
+SET LAST_NAME = 'Tyson';
+
+UPDATE OUR_FIRST_DB.PUBLIC.TEST
+SET JOB = 'Data Analyst';
+
+
+CREATE OR REPLACE TABLE OUR_FIRST_DB.PUBLIC.test_backup as
+SELECT * FROM OUR_FIRST_DB.PUBLIC.TEST before (statement => '01b1da57-3200-fbb1-0007-95ce00010326')
+
+TRUNCATE OUR_FIRST_DB.PUBLIC.TEST
+
+INSERT INTO OUR_FIRST_DB.PUBLIC.TEST
+SELECT * FROM OUR_FIRST_DB.PUBLIC.TEST_BACKUP
+
+SELECT * FROM OUR_FIRST_DB.PUBLIC.TEST
