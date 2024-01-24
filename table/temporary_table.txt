@@ -1,0 +1,44 @@
+USE DATABASE PDB;
+
+CREATE OR REPLACE TABLE PDB.public.customers (
+   id int,
+   first_name string,
+  last_name string,
+  email string,
+  gender string,
+  Job string,
+  Phone string);
+
+  
+INSERT INTO PDB.public.customers
+SELECT t1.* FROM OUR_FIRST_DB.public.customers t1
+CROSS JOIN (SELECT * FROM OUR_FIRST_DB.public.customers) t2
+
+SELECT * FROM PDB.public.customers
+
+// Create temporary table with the same name
+CREATE OR REPLACE TEMPORARY TABLE PDB.public.customers (
+   id int,
+   first_name string,
+  last_name string,
+  email string,
+  gender string,
+  Job string,
+  Phone string);
+
+CREATE OR REPLACE TEMPORARY TABLE PDB.public.temp_table (
+   id int,
+   first_name string,
+  last_name string,
+  email string,
+  gender string,
+  Job string,
+  Phone string);
+
+// insert data in the new table
+INSERT INTO PDB.public.temp_table
+SELECT * FROM PDB.public.customers
+
+SELECT * FROM PDB.public.temp_table
+
+SHOW TABLES;
