@@ -1,0 +1,372 @@
+/// stream example: INsert
+CREATE OR REPLACE DATABASE STREAMS_DB;
+
+/// Create example table
+CREATE OR REPLACE table sales_raw_staging (
+    id VARCHAR,
+    product varchar,
+    price varchar,
+    amount varchar,
+    store_id varchar
+);
+
+-- insert values 
+insert into sales_raw_staging
+    values
+        (1, 'Banana', 1.99, 1, 1),
+        (2, 'Lemon', 0.99, 1, 1),
+        (3, 'Apple', 1.79, 1, 2),
+        (4, 'Orange Juice', 1.89, 1, 2),
+        (5, 'Cereals', 5.98, 2, 1);
+
+create or replace table store_table (
+    store_id number,
+    location varchar,
+    employees number);
+
+insert into store_table values(1, 'Chicago', 33);
+insert into store_table values(2, 'London', 12);
+
+create or replace table sales_final_table(
+    id int,
+    product varchar,
+    price number,
+    amount int,
+    store_id int,
+    location varchar,
+    employees int
+);
+
+-- insert into final table
+insert into sales_final_table
+    select
+    sa.id,
+    sa.product,
+    sa.price,
+    st.store_id,
+    st.location,
+    st.employees
+    from sales_raw_staging sa
+    join store_table st on st.store_id=sa.store_id;
+
+-- create a stream object
+create or replace stream sales_stream on table sales_raw_staging
+
+show streams;
+
+desc stream sales_stream;
+
+---- get changes on data using streams (insert)
+select * from sales_stream;
+select * from sales_raw_staging;
+
+-- insert values
+
+insert into sales_raw_staging
+    values
+            (6, 'mango', 1.99, 1, 2),
+            (7, 'garlic', 0.99, 1, 1)
+
+-- get changes on data using stream (inserts)
+select * from sales_stream;
+select * from sales_raw_staging;
+select * from sales_final_table;
+
+-- consume stream object
+INSERT into sales_final_table
+select
+sa.id,
+sa.product,
+sa.price,
+st.store_id,
+st.location,
+st.employees
+from sales_stream sa
+join store_table st on st.store_id=sa.store_id;
+
+---get changes on data using stream (inserts)
+select * from sales_stream;
+
+//// UPdate 1
+
+select * from sales_raw_staging
+select * from sales_stream;
+
+update sales_raw_staging
+set product = 'Potato' where product = 'Banana'
+
+merge into sales_final_table F  -- target table to merge changes from source table
+using sales_stream s  --- stream that has captured the changes
+    on f.id = s.id
+when matched
+    and s.metadata$action='insert'
+    and s.metadata$isupdate = 'TRUE' // Indicates the record has been updated
+    then update
+    set f.product = s.product,
+        f.price = s.amount,
+        f.store_id = s.store_id;
+
+select * from sales_final_table;
+select * from sales_raw_staging;
+select * from sales_stream;
+
+
+/// Update 2
+update sales_raw_staging
+set product = 'Green apple' where product = 'Apple'
+
+merge into sales_final_table f --- target table to merge changes from source table
+using sales_stream s
+    on f.id = s.id
+when matched
+    and s.METADATA$ACTION='INSERT'
+    and s.METADATA$ISUPDATE
+    then update
+    set f.product = s.product,
+        f.price = s.amount,
+        f.store_id=s.store_id;
+
+select * from sales_final_table;
+select * from sales_raw_staging;
+select * from sales_stream;
+
+
+/// DELETE
+select * from sales_final_table;
+select * from sales_raw_staging;
+select * from sales_stream;
+
+
+delete from sales_raw_staging
+where product = 'Lemon';
+
+
+/// process stream
+merge into sales_final_table f
+using sales_stream s
+    on f.id = s.id
+when matched
+    and S.METADATA$ACTION='DELETE'
+    and S.METADATA$ACTION='FALSE'
+    then delete
+
+select * from sales_final_table;
+select * from sales_raw_staging;
+select * from sales_stream;
+
+/// process 
+insert into sales_raw_staging values (2, 'Lemon', 0.99, 1, 1);
+
+update sales_raw_staging
+set product='lemonade'
+where product='Lemon';
+
+
+merge into SALES_FINAL_TABLE F      -- Target table to merge changes from source table
+USING ( SELECT STRE.*,ST.location,ST.employees
+        FROM SALES_STREAM STRE
+        JOIN STORE_TABLE ST
+        ON STRE.store_id = ST.store_id
+       ) S
+ON F.id=S.id
+when matched                        -- DELETE condition
+    and S.METADATA$ACTION ='DELETE' 
+    and S.METADATA$ISUPDATE = 'FALSE'
+    then delete                   
+when matched                        -- UPDATE condition
+    and S.METADATA$ACTION ='INSERT' 
+    and S.METADATA$ISUPDATE  = 'TRUE'       
+    then update 
+    set f.product = s.product,
+        f.price = s.price,
+        f.amount= s.amount,
+        f.store_id=s.store_id
+when not matched 
+    and S.METADATA$ACTION ='INSERT'
+    then insert 
+    (id,product,price,store_id,amount,employees,location)
+    values
+    (s.id, s.product,s.price,s.store_id,s.amount,s.employees,s.location)
+
+
+select * from sales_final_table;
+select * from sales_raw_staging;
+select * from sales_stream;
+
+
+/// Automate the updates using tasks
+
+create or replace task all_data_changes
+    warehouse = COMPUTE_WH
+    schedule = '1 MINUTE'
+    WHEN SYSTEM$STREAM_HAS_DATA('SALES_STREAM')
+    AS
+merge into SALES_FINAL_TABLE F -- target table to merge changes from source table
+using ( select STRE.*, ST.location, ST.employees
+        FROM SALES_STREAM STRE
+        JOIN STORE_TABLE ST
+        ON STRE.store_id = ST.STORE_ID
+) S
+ON F.id = S.id
+when matched
+    and S.METADATA$ACTION='DELETE'
+    and S.METADATA$ACTION = 'FALSE'
+    then delete
+when matched
+    and S.METADATA$ACTION='INSERT'
+    and S.METADATA$ACTION = 'TRUE'
+    then update
+    set f.product = s.product,
+        f.price = s.price,
+        f.amount = s.amount,
+        f.store_id = s.store_id
+when not matched
+    and S.METADATA$ACTION='INSERT'
+    then insert
+    (id, product, price, store_id, amount, employees, location)
+    values
+    (s.id, s.product, s.price, s.store_id, s.amount, s.employees, s.location)
+
+alter task all_data_changes resume;
+show tasks;
+
+// change data
+insert into sales_raw_staging values (11, 'Milk', 1.99, 1, 2);
+insert into sales_raw_staging values (12, 'Chocolate', 4.49, 1, 2);
+insert into sales_raw_staging values (13, 'Cheese', 3.89, 1, 2);
+
+update sales_raw_staging
+set product = 'Chocolate bar'
+where product = 'Chocolate';
+
+delete from sales_raw_staging
+where product = 'Mango';
+
+// verify results
+select * from sales_raw_staging
+select * from sales_stream;
+select * from sales_final_table;
+
+// verify history
+select *
+from table(information_schema.task_history())
+order by name asc, scheduled_time desc;
+
+
+-- append only
+USE  STREAMS_DB;
+SHOW streams;
+
+-- create stream with default
+create or replace stream sales_stream_default
+on table sales_raw_staging;
+
+--- create stream with append-only
+create or replace stream sales_stream_append
+on table sales_raw_staging
+APPEND_ONLY=TRUE;
+
+-- view streams
+SHOW STREAMS;
+
+-- insert values
+insert into sales_raw_staging values (14, 'Honey', 4.99, 1, 1);
+insert into sales_raw_staging values (15, 'Coffee', 4.89, 1, 2);
+insert into sales_raw_staging values (15, 'Coffee', 4.89, 1, 2);
+
+select * from sales_stream_append;
+select * from sales_stream_default;
+
+-- delete values
+select * from sales_raw_staging
+delete from sales_raw_staging where id=7;
+
+// consume stream via "create table ... as"
+create or replace temporary table product_table
+as select * from sales_stream_default;
+create or replace temporary table product_table
+as select * from sales_stream_append;
+
+
+-- update 
+update sales_raw_staging
+set product = 'Coffee 200g'
+where product = 'Coffee';
+
+select * from sales_stream_append;
+select * from sales_stream_default;
+
+
+// change clauses
+// create example db & table
+create or replace database sales_db;
+
+create or replace table sales_raw (
+    id varchar,
+    product varchar,
+    price varchar,
+    amount varchar,
+    store_id varchar);
+
+-- insert values
+insert into sales_raw
+    values
+        (1, 'Eggs', 1.39, 1, 1),
+        (2, 'Baking power', 0.99, 1, 1),
+        (3, 'Eggplants', 1.79, 1, 2),
+        (4, 'Ice cream', 1.89, 1, 2),
+        (5, 'Oats', 1.98, 2, 2);
+
+alter table sales_raw
+set change_tracking = TRUE;
+
+SELECT * FROM SALES_RAW
+CHANGES(information => default)
+AT (offset => -0.5*60)
+
+SELECT CURRENT_TIMESTAMP;
+
+-- Insert values
+
+
+INSERT INTO SALES_RAW VALUES (6, 'Bread', 2.99, 1, 2);
+INSERT INTO SALES_RAW VALUES (7, 'Onions', 2.89, 1, 2);
+
+
+SELECT * FROM SALES_RAW
+CHANGES(information  => default)
+AT (timestamp => '2024-01-25 19:25:48.547 -0800'::timestamp_tz)
+
+UPDATE SALES_RAW
+SET PRODUCT = 'Toast2' WHERE ID=6;
+
+SELECT * FROM SALES_RAW
+CHANGES(information  => default)
+AT (timestamp => '2024-01-25 19:25:48.547 -0800'::timestamp_tz)
+
+UPDATE SALES_RAW
+SET PRODUCT = 'Toast2' WHERE ID=6;
+
+// information value
+
+
+SELECT * FROM SALES_RAW
+CHANGES(information  => default)
+AT (timestamp => '2024-01-25 19:25:48.547 -0800'::timestamp_tz)
+
+
+SELECT * FROM SALES_RAW
+CHANGES(information  => append_only)
+AT (timestamp => '2024-01-25 19:25:48.547 -0800'::timestamp_tz)
+
+CREATE OR REPLACE TABLE PRODUCTS 
+AS
+SELECT * FROM SALES_RAW
+CHANGES(information  => append_only)
+AT (timestamp => '2024-01-25 19:25:48.547 -0800'::timestamp_tz)
+
+
+SELECT * FROM PRODUCTS;
+
+
+

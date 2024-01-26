@@ -1,0 +1,33 @@
+// create a storage procedure
+USE TASK_DB
+
+SELECT * FROM CUSTOMERS
+
+// call a procedure
+
+CREATE OR REPLACE PROCEDURE CUSTOMER_INSERT_PROCEDURE (CREATE_DATE varchar)
+    RETURNS STRING NOT NULL
+    LANGUAGE JAVASCRIPT
+    AS
+     $$
+        var sql_command = 'INSERT INTO CUSTOMERS(CREATE DATE) VALUES(:1);'
+        snowflake.execute(
+        {
+        sqlText: sql_commands,
+        binds: [CREATE_DATE]
+        }
+        );
+    return "Successfully executed"
+    $$;
+
+CREATE OR REPLACE TASK CUSTOMER_TASK_PROCEDURE
+WAREHOUSE = COMPUTE_WH
+SCHEDULE = '1 MINUTE'
+AS CALL CUSTOMER_INSERT_PROCEDURE (CURRENT_TIMESTAMP);
+
+SHOW TASKS;
+
+ALTER TASK CUSTOMER_TASK_PROCEDURE RESUME;
+
+SELECT * FROM CUSTOMERS;
+
